@@ -1,0 +1,97 @@
+---
+title: "InitialPlots"
+author: "Stella Lee"
+date: "11/25/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r warning=FALSE}
+library(dplyr)
+library(ggplot2)
+library(mosaic)
+library(gridExtra)
+nypd <- read.csv("C://Users/stella/Documents/STA/NYPD_Before_2016.csv")
+nypd$arstmade <- ifelse(nypd$arstmade == "Y", 1, 0)
+nypd$frisked <- ifelse(nypd$frisked == "Y", 1, 0)
+nypd$searched <- ifelse(nypd$searched == "Y", 1, 0)
+```
+
+# Race
+```{r}
+nypd_race <- summarize(nypd %>% group_by(race),
+                       perc_arrest = mean(arstmade, na.rm = TRUE) * 100,
+                       perc_frisk = mean(frisked, na.rm = TRUE) * 100, 
+                       perc_search = mean(searched, na.rm = TRUE) * 100)
+
+arr <- ggplot(data=nypd_race, aes(x=race, y=perc_arrest))  + geom_bar(stat="identity")
+frisk <- ggplot(data=nypd_race, aes(x=race, y=perc_frisk))  + geom_bar(stat="identity")
+sear <- ggplot(data=nypd_race, aes(x=race, y=perc_search))  + geom_bar(stat="identity")
+geom_line(aes(y = perc_frisk, colour = "perc_frisk")) +
+  geom_line(aes(y = perc_search, colour = "perc_arrest")) 
+# grid.arrange(arr, frisk, sear)
+
+ggplot(data= nypd_race, aes(race)) +
+  geom_point(aes(y = perc_arrest, colour = "perc_arrest")) +
+  geom_point(aes(y = perc_frisk, colour = "perc_frisk")) +
+  geom_point(aes(y = perc_search, colour = "perc_search")) 
+```
+
+# Gender (Sex)
+```{r}
+nypd_sex <- summarize(nypd %>% group_by(sex),
+                       perc_arrest = mean(arstmade,na.rm = TRUE) * 100,
+                       perc_frisk = mean(frisked,na.rm = TRUE) * 100, 
+                       perc_search = mean(searched,na.rm = TRUE) * 100)
+
+arr <- ggplot(data=nypd_sex, aes(x=sex, y=perc_arrest))  + geom_bar(stat="identity")
+frisk <- ggplot(data=nypd_sex, aes(x=sex, y=perc_frisk))  + geom_bar(stat="identity")
+sear <- ggplot(data=nypd_sex, aes(x=sex, y=perc_search))  + geom_bar(stat="identity")
+
+# grid.arrange(arr, frisk, sear)
+
+ggplot(data= nypd_sex, aes(sex)) +
+  geom_point(aes(y = perc_arrest, colour = "perc_arrest")) +
+  geom_point(aes(y = perc_frisk, colour = "perc_frisk")) +
+  geom_point(aes(y = perc_search, colour = "perc_search"))
+```
+
+# In/Out
+```{r}
+nypd_inout <- summarize(nypd %>% group_by(inout),
+                       perc_arrest = mean(arstmade,na.rm = TRUE) * 100,
+                       perc_frisk = mean(frisked,na.rm = TRUE) * 100, 
+                       perc_search = mean(searched,na.rm = TRUE) * 100)
+
+arr <- ggplot(data=nypd_inout, aes(x=inout, y=perc_arrest))  + geom_bar(stat="identity")
+frisk <- ggplot(data=nypd_inout, aes(x=inout, y=perc_frisk))  + geom_bar(stat="identity")
+sear <- ggplot(data=nypd_inout, aes(x=inout, y=perc_search))  + geom_bar(stat="identity")
+
+grid.arrange(arr, frisk, sear)
+```
+
+# RecStat
+```{r}
+
+```
+
+# Weight 
+```{r}
+#ggplot(data=nypd, aes(x=weight, y= arstmade)) + geom_point()
+ggplot(data=nypd, aes(x=factor(arstmade), y= weight)) + geom_boxplot()
+```
+
+# Height
+```{r}
+```
+
+# BMI
+```{r}
+```
+
+# Duration of stop (perstop) -- surivival analysis
+
+# Duration of observation (perobs)  -- surivival analysis
