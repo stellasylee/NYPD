@@ -1,0 +1,63 @@
+---
+title: "310 Final Project Meeting"
+author: "Stella Lee"
+date: "12/2/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r warning=FALSE}
+nypd <- read.csv("C:/Users/stella/Documents/STA/STA310/nypd_data.csv")
+```
+
+```{r warning=FALSE}
+library(dplyr)
+library(ggplot2)
+```
+
+```{r}
+nypd_race <- summarize(nypd %>% group_by(SUSPECT_RACE_DESCRIPTION),
+                       perc_arrest = mean(SUSPECT_ARRESTED_FLAG, na.rm = TRUE) * 100,
+                       perc_frisk = mean(FRISKED_FLAG, na.rm = TRUE) * 100, 
+                       perc_search = mean(SEARCHED_FLAG, na.rm = TRUE) * 100)
+ggplot(data= nypd_race, aes(SUSPECT_RACE_DESCRIPTION)) +
+  geom_point(aes(y = perc_arrest, colour = "perc_arrest")) +
+  geom_point(aes(y = perc_frisk, colour = "perc_frisk")) +
+  geom_point(aes(y = perc_search, colour = "perc_search")) 
+```
+
+```{r}
+nypd.frisked <- glm(FRISKED_FLAG ~LOCATION_IN_OUT_CODE+ YEAR + SUMMONS_ISSUED_FLAG + OTHER_CONTRABAND_FLAG+CIRCUMSTANCES_WEAPON+SUSPECTS_ACTIONS_DRUG_TRANSACTIONS_FLAG+CIRCUMSTANCES_SURVEILLANCE+SUSPECT_HEIGHT+SUSPECT_SEX+STOP_LOCATION_PRECINCT+WEAPON+PHYSICAL_FORCE_WEAPON_IMPACT_FLAG+PHYSICAL_FORCE_HANDCUFF_SUSPECT_FLAG+ PHYSICAL_FORCE_DRAW_POINT_FIREARM_FLAG+ PHYSICAL_FORCE_OTHER_FLAG, family="binomial", data=nypd)
+summary(nypd.frisked)
+```
+
+```{r}
+nypd.frisked.race <- glm(FRISKED_FLAG ~LOCATION_IN_OUT_CODE+ YEAR + SUMMONS_ISSUED_FLAG + OTHER_CONTRABAND_FLAG+CIRCUMSTANCES_WEAPON+SUSPECTS_ACTIONS_DRUG_TRANSACTIONS_FLAG+CIRCUMSTANCES_SURVEILLANCE+SUSPECT_HEIGHT+SUSPECT_SEX+STOP_LOCATION_PRECINCT+WEAPON+PHYSICAL_FORCE_WEAPON_IMPACT_FLAG+PHYSICAL_FORCE_HANDCUFF_SUSPECT_FLAG+ PHYSICAL_FORCE_DRAW_POINT_FIREARM_FLAG+ PHYSICAL_FORCE_OTHER_FLAG + SUSPECT_RACE_DESCRIPTION, family="binomial", data=nypd)
+summary(nypd.frisked.race)
+#anova(nypd.frisked.race, test="Chisq")
+# resid(nypd.frisked.race, type='pearson')
+#plot(nypd.frisked.race)
+```
+
+```{r}
+# Drop-in-deviance test
+anova(nypd.frisked, nypd.frisked.race)
+G = nypd.frisked$null.deviance - nypd.frisked.race$deviance
+df = 6
+1-pchisq(G, df)
+#anova(nypd.frisked, nypd.frisked.race, test="LRT")
+```
+
+```{r}
+cols <- colnames(nypd)
+nypd[cols] <- lapply(nypd[cols], factor) 
+nypd$OBSERVED_DURATION_MINUTES <- as.numeric(nypd$OBSERVED_DURATION_MINUTES)
+nypd$STOP_DURATION_MINUTES <- as.numeric(nypd$STOP_DURATION_MINUTES)
+nypd$STOP_LOCATION_X <- as.numeric(nypd$STOP_LOCATION_X)
+nypd$STOP_LOCATION_Y <- as.numeric(nypd$STOP_LOCATION_Y)
+nypd$SUSPECT_REPORTED_AGE <- as.numeric(nypd$SUSPECT_REPORTED_AGE)
+nypd$SUSPECT_HEIGHT <- as.numeric(nypd$SUSPECT_HEIGHT)
+```
