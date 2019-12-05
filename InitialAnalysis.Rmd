@@ -46,10 +46,15 @@ summary(nypd.frisked.full.fil)
 ```
 
 # Deviance Plots
+https://drsimonj.svbtle.com/visualising-residuals
 ```{r}
-res <- residuals(nypd.frisked.full, type = "deviance") 
-plot(predict(nypd.frisked.full), res, xlab="Fitted values", ylab = "Residuals", ylim = max(abs(res)) * c(-1,1))
-abline(h = 0, lty = 2)
+full.residuals <- data.frame (nypd_filtered, predicted = predict(nypd.frisked.full), res = residuals(nypd.frisked.full, type = "deviance"))
+
+ggplot(full.residuals, aes(x = PHYSICAL_FORCE_OTHER_FLAG, y = FRISKED_FLAG))+
+  geom_segment(aes(xend = PHYSICAL_FORCE_OTHER_FLAG, yend = predicted), alpha = .2) +  # Lines 
+  geom_point() + 
+  geom_point(aes(y = predicted), shape = 1) +  # Points of predicted 
+  theme_bw()
 ```
 
 ## Exploration for finding best model by Wald's Test
