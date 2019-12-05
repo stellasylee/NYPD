@@ -10,7 +10,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ```{r warning=FALSE}
-nypd <- read.csv("C:/Users/stella/Documents/STA/STA310/nypd_data.csv")
+nypd <- read.csv("//storage/Projects/Mat/STA310-Kuiper/Final Project/4_LeeKozikJindal_NYPD/FinalData.csv")
 ```
 
 ```{r warning=FALSE}
@@ -19,20 +19,23 @@ library(ggplot2)
 ```
 
 ```{r}
-nypd_race <- summarize(nypd %>% group_by(SUSPECT_RACE_DESCRIPTION),
-                       perc_arrest = mean(SUSPECT_ARRESTED_FLAG, na.rm = TRUE) * 100,
-                       perc_frisk = mean(FRISKED_FLAG, na.rm = TRUE) * 100, 
-                       perc_search = mean(SEARCHED_FLAG, na.rm = TRUE) * 100)
-ggplot(data= nypd_race, aes(SUSPECT_RACE_DESCRIPTION)) +
-  geom_point(aes(y = perc_arrest, colour = "perc_arrest")) +
-  geom_point(aes(y = perc_frisk, colour = "perc_frisk")) +
-  geom_point(aes(y = perc_search, colour = "perc_search")) 
+# change variables to factor if it is needed
+nypd$LOCATION_IN_OUT_CODE <- as.factor(nypd$LOCATION_IN_OUT_CODE)
+nypd$YEAR <- as.factor(nypd$YEAR)
 ```
 
+# Logistic Regression model for frisked flag
+
 ```{r}
-nypd.frisked <- glm(FRISKED_FLAG ~LOCATION_IN_OUT_CODE+ YEAR + SUMMONS_ISSUED_FLAG + OTHER_CONTRABAND_FLAG+CIRCUMSTANCES_WEAPON+SUSPECTS_ACTIONS_DRUG_TRANSACTIONS_FLAG+CIRCUMSTANCES_SURVEILLANCE+SUSPECT_HEIGHT+SUSPECT_SEX+STOP_LOCATION_PRECINCT+WEAPON+PHYSICAL_FORCE_WEAPON_IMPACT_FLAG+PHYSICAL_FORCE_HANDCUFF_SUSPECT_FLAG+ PHYSICAL_FORCE_DRAW_POINT_FIREARM_FLAG+ PHYSICAL_FORCE_OTHER_FLAG, family="binomial", data=nypd)
-summary(nypd.frisked)
+nypd.frisked.full <- glm(FRISKED_FLAG ~LOCATION_IN_OUT_CODE+ YEAR + SUMMONS_ISSUED_FLAG + OTHER_CONTRABAND_FLAG+CIRCUMSTANCES_WEAPON+SUSPECTS_ACTIONS_DRUG_TRANSACTIONS_FLAG+CIRCUMSTANCES_SURVEILLANCE+SUSPECT_HEIGHT+SUSPECT_SEX+STOP_LOCATION_PRECINCT+WEAPON+PHYSICAL_FORCE_WEAPON_IMPACT_FLAG+PHYSICAL_FORCE_HANDCUFF_SUSPECT_FLAG+ PHYSICAL_FORCE_DRAW_POINT_FIREARM_FLAG+ PHYSICAL_FORCE_OTHER_FLAG, family="binomial", data=nypd)
+summary(nypd.frisked.full)
 ```
+
+## Exploration for finding best model by Wald's Test
+```{r}
+```
+
+# Drop-in-deviance test for Race
 
 ```{r}
 nypd.frisked.race <- glm(FRISKED_FLAG ~LOCATION_IN_OUT_CODE+ YEAR + SUMMONS_ISSUED_FLAG + OTHER_CONTRABAND_FLAG+CIRCUMSTANCES_WEAPON+SUSPECTS_ACTIONS_DRUG_TRANSACTIONS_FLAG+CIRCUMSTANCES_SURVEILLANCE+SUSPECT_HEIGHT+SUSPECT_SEX+STOP_LOCATION_PRECINCT+WEAPON+PHYSICAL_FORCE_WEAPON_IMPACT_FLAG+PHYSICAL_FORCE_HANDCUFF_SUSPECT_FLAG+ PHYSICAL_FORCE_DRAW_POINT_FIREARM_FLAG+ PHYSICAL_FORCE_OTHER_FLAG + SUSPECT_RACE_DESCRIPTION, family="binomial", data=nypd)
@@ -49,15 +52,4 @@ G = nypd.frisked$null.deviance - nypd.frisked.race$deviance
 df = 6
 1-pchisq(G, df)
 #anova(nypd.frisked, nypd.frisked.race, test="LRT")
-```
-
-```{r}
-cols <- colnames(nypd)
-nypd[cols] <- lapply(nypd[cols], factor) 
-nypd$OBSERVED_DURATION_MINUTES <- as.numeric(nypd$OBSERVED_DURATION_MINUTES)
-nypd$STOP_DURATION_MINUTES <- as.numeric(nypd$STOP_DURATION_MINUTES)
-nypd$STOP_LOCATION_X <- as.numeric(nypd$STOP_LOCATION_X)
-nypd$STOP_LOCATION_Y <- as.numeric(nypd$STOP_LOCATION_Y)
-nypd$SUSPECT_REPORTED_AGE <- as.numeric(nypd$SUSPECT_REPORTED_AGE)
-nypd$SUSPECT_HEIGHT <- as.numeric(nypd$SUSPECT_HEIGHT)
 ```
