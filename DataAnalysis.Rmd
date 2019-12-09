@@ -46,20 +46,26 @@ summary(nypd.frisked.full.fil)
 
 # Confusion Matrix
 ```{r}
-full.residuals <- data.frame (nypd_filtered, predicted = predict(nypd.frisked.full), res = residuals(nypd.frisked.full, type = "deviance"))
-frisked_prediction <- 
+full.residuals <- data.frame (nypd_filtered, predicted = nypd.frisked.full$fitted.values)
+full.residuals$res <- full.residuals$FRISKED_FLAG - full.residuals$predicted
+full.residuals$res_pearson <- residuals(nypd.frisked.full, "pearson")
+write.csv(full.residuals, "//storage/Projects/Mat/STA310-Kuiper/Final Project/4_LeeKozikJindal_NYPD/full_model.csv")
+frisked_prediction <-ifelse(full.residuals$predicted > 0.50, 1, 0)
+confusionMatrix(as.factor(frisked_prediction), as.factor(full.residuals$FRISKED_FLAG))
 ```
 
-# Deviance Plots
+# Residual Plots
 https://drsimonj.svbtle.com/visualising-residuals
 https://cran.r-project.org/web/packages/HSAUR/vignettes/Ch_logistic_regression_glm.pdf
 ```{r}
+# Create test set for plot
+set.seed(25)
+test.id <- sample(1:nrow(full.residuals), size = .1*nrow(full.residuals))
+test.data <- full.residuals[test.id,]
 
-ggplot(full.residuals, aes(x = PHYSICAL_FORCE_OTHER_FLAG, y = FRISKED_FLAG))+
-  geom_segment(aes(xend = PHYSICAL_FORCE_OTHER_FLAG, yend = predicted), alpha = .2) +  # Lines 
-  geom_point() + 
-  geom_point(aes(y = predicted), shape = 1) +  # Points of predicted 
-  theme_bw()
+ggplot(test.data, aes(x = predicted, y = res_pearson))+
+  geom_point()
+
 ```
 
 ## Exploration for finding best model by Wald's Test
