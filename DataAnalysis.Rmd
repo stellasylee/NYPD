@@ -1,0 +1,117 @@
+---
+title: "310 Final Project Meeting"
+author: "Stella Lee"
+date: "12/2/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r warning=FALSE}
+nypd <- read.csv("//storage/Projects/Mat/STA310-Kuiper/Final Project/4_LeeKozikJindal_NYPD/FinalData.csv")
+```
+
+```{r warning=FALSE}
+# Loading Library
+library(dplyr)
+library(ggplot2)
+```
+
+
+```{r}
+# change variables to factor if it is needed
+nypd$LOCATION_IN_OUT_CODE <- as.factor(nypd$LOCATION_IN_OUT_CODE)
+nypd$YEAR <- as.factor(nypd$YEAR)
+```
+
+# Logistic Regression model for frisked flag
+
+```{r}
+nypd.frisked.full <- glm(FRISKED_FLAG ~LOCATION_IN_OUT_CODE+ YEAR + SUMMONS_ISSUED_FLAG + OTHER_CONTRABAND_FLAG+
+                           CIRCUMSTANCES_WEAPON+SUSPECTS_ACTIONS_DRUG_TRANSACTIONS_FLAG+
+                           CIRCUMSTANCES_SURVEILLANCE+SUSPECT_HEIGHT+SUSPECT_SEX+SUSPECT_BODY_BUILD_TYPE+ PERC_BLACK_BOR+WEAPON+PHYSICAL_FORCE_WEAPON_IMPACT_FLAG+
+                           PHYSICAL_FORCE_HANDCUFF_SUSPECT_FLAG+PHYSICAL_FORCE_DRAW_POINT_FIREARM_FLAG+ PHYSICAL_FORCE_OTHER_FLAG,
+                         family="binomial", data=nypd)
+summary(nypd.frisked.full) # AIC: 3341447
+
+nypd_filtered =na.omit(nypd[ , all.vars(formula(nypd.frisked.full))]) # for consistency in drop-in-deviance
+nypd.frisked.full.fil <- glm(FRISKED_FLAG ~LOCATION_IN_OUT_CODE+ YEAR + SUMMONS_ISSUED_FLAG + OTHER_CONTRABAND_FLAG+
+                           CIRCUMSTANCES_WEAPON+SUSPECTS_ACTIONS_DRUG_TRANSACTIONS_FLAG+
+                           CIRCUMSTANCES_SURVEILLANCE+SUSPECT_HEIGHT+SUSPECT_SEX+SUSPECT_BODY_BUILD_TYPE+
+                           STOP_LOCATION_PRECINCT+WEAPON+PHYSICAL_FORCE_WEAPON_IMPACT_FLAG+
+                           PHYSICAL_FORCE_HANDCUFF_SUSPECT_FLAG+PHYSICAL_FORCE_DRAW_POINT_FIREARM_FLAG+ PHYSICAL_FORCE_OTHER_FLAG,
+                         family="binomial", data=nypd_filtered)
+summary(nypd.frisked.full.fil)
+```
+
+# Deviance Plots
+https://drsimonj.svbtle.com/visualising-residuals
+https://cran.r-project.org/web/packages/HSAUR/vignettes/Ch_logistic_regression_glm.pdf
+```{r}
+full.residuals <- data.frame (nypd_filtered, predicted = predict(nypd.frisked.full), res = residuals(nypd.frisked.full, type = "deviance"))
+ggplot(full.residuals, aes(x = PHYSICAL_FORCE_OTHER_FLAG, y = FRISKED_FLAG))+
+  geom_segment(aes(xend = PHYSICAL_FORCE_OTHER_FLAG, yend = predicted), alpha = .2) +  # Lines 
+  geom_point() + 
+  geom_point(aes(y = predicted), shape = 1) +  # Points of predicted 
+  theme_bw()
+```
+
+## Exploration for finding best model by Wald's Test
+```{r}
+# Top 9 Wald's test statistics
+nypd.frisked.1 <- glm(FRISKED_FLAG ~LOCATION_IN_OUT_CODE+OTHER_CONTRABAND_FLAG+CIRCUMSTANCES_WEAPON+
+                        SUSPECTS_ACTIONS_DRUG_TRANSACTIONS_FLAG+CIRCUMSTANCES_SURVEILLANCE+SUSPECT_SEX+WEAPON+
+                        PHYSICAL_FORCE_HANDCUFF_SUSPECT_FLAG+PHYSICAL_FORCE_OTHER_FLAG, family="binomial", data=nypd_filtered)
+summary(nypd.frisked.1)
+# drop-in-deviance test for comparing two models
+anova(nypd.frisked.1, nypd.frisked.full.fil)
+G = nypd.frisked.1$null.deviance - nypd.frisked.full.fil$deviance # 904100.6
+1-pchisq(G, df=19) # 0
+```
+
+```{r}
+nypd.frisked.11 <- glm(FRISKED_FLAG ~LOCATION_IN_OUT_CODE+OTHER_CONTRABAND_FLAG+CIRCUMSTANCES_WEAPON+
+                        SUSPECTS_ACTIONS_DRUG_TRANSACTIONS_FLAG+CIRCUMSTANCES_SURVEILLANCE+SUSPECT_SEX+SUSPECT_BODY_BUILD_TYPE+WEAPON+
+                        PHYSICAL_FORCE_HANDCUFF_SUSPECT_FLAG+PHYSICAL_FORCE_OTHER_FLAG+PHYSICAL_FORCE_DRAW_POINT_FIREARM_FLAG, family="binomial", data=nypd_filtered)
+summary(nypd.frisked.11)
+anova(nypd.frisked.1, nypd.frisked.11)
+G = nypd.frisked.1$null.deviance - nypd.frisked.11$deviance # 892663.7
+1-pchisq(G, df=4) # 0
+anova(nypd.frisked.11, nypd.frisked.full.fil)
+G = nypd.frisked.11$null.deviance - nypd.frisked.full.fil$deviance # 904100.6
+1-pchisq(G, df=15) # 0
+```
+
+```{r}
+# Drop 2 least significant variables
+nypd.frisked.drop.2 <- glm(FRISKED_FLAG ~LOCATION_IN_OUT_CODE + SUMMONS_ISSUED_FLAG + OTHER_CONTRABAND_FLAG+
+                           CIRCUMSTANCES_WEAPON+SUSPECTS_ACTIONS_DRUG_TRANSACTIONS_FLAG+
+                           CIRCUMSTANCES_SURVEILLANCE+SUSPECT_HEIGHT+SUSPECT_SEX+SUSPECT_BODY_BUILD_TYPE+
+                           STOP_LOCATION_PRECINCT+WEAPON+
+                           PHYSICAL_FORCE_HANDCUFF_SUSPECT_FLAG+PHYSICAL_FORCE_DRAW_POINT_FIREARM_FLAG+ PHYSICAL_FORCE_OTHER_FLAG,
+                         family="binomial", data=nypd_filtered)
+summary(nypd.frisked.drop.2)
+anova(nypd.frisked.drop.2, nypd.frisked.full.fil)
+G = nypd.frisked.drop.2$null.deviance - nypd.frisked.full.fil$deviance # 904100.6
+1-pchisq(G, df=12) # 0
+```
+
+# Drop-in-deviance test for Race
+```{r}
+nypd.frisked.race <- glm(FRISKED_FLAG ~LOCATION_IN_OUT_CODE+ YEAR + SUMMONS_ISSUED_FLAG + OTHER_CONTRABAND_FLAG+CIRCUMSTANCES_WEAPON+SUSPECTS_ACTIONS_DRUG_TRANSACTIONS_FLAG+CIRCUMSTANCES_SURVEILLANCE+SUSPECT_HEIGHT+SUSPECT_SEX+STOP_LOCATION_PRECINCT+WEAPON+PHYSICAL_FORCE_WEAPON_IMPACT_FLAG+PHYSICAL_FORCE_HANDCUFF_SUSPECT_FLAG+ PHYSICAL_FORCE_DRAW_POINT_FIREARM_FLAG+ PHYSICAL_FORCE_OTHER_FLAG + SUSPECT_RACE_DESCRIPTION, family="binomial", data=nypd)
+summary(nypd.frisked.race)
+#anova(nypd.frisked.race, test="Chisq")
+# resid(nypd.frisked.race, type='pearson')
+#plot(nypd.frisked.race)
+```
+
+```{r}
+# Drop-in-deviance test
+anova(nypd.frisked, nypd.frisked.race)
+G = nypd.frisked$null.deviance - nypd.frisked.race$deviance
+df = 6
+1-pchisq(G, df)
+#anova(nypd.frisked, nypd.frisked.race, test="LRT")
+```
