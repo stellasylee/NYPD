@@ -1,12 +1,13 @@
 ---
-title: "Frisked"
+title: "Frisked Logistic Regression"
+author: "Stella Lee"
+date: "12/2/2019"
 output: html_document
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
-
 
 ```{r warning=FALSE}
 # Loading Library
@@ -15,75 +16,177 @@ library(ggplot2)
 library(caret)
 library(e1071)
 library(pROC)
-nypd <- read.csv("//storage/Projects/Mat/STA310-Kuiper/Final Project/4_LeeKozikJindal_NYPD/FinalData_Logistic.csv")
+library(ROCR)
+library(plotROC)
+nypd <- read.csv("//storage/Projects/Mat/STA310-Kuiper/Final Project/4_LeeKozikJindal_NYPD/FinalData.csv")
+nypd<- filter(nypd, !is.na(nypd$YEAR2))
 ```
 
 ```{r}
 # change variables to factor if it is needed
 nypd$LOCATION_IN_OUT_CODE <- as.factor(nypd$LOCATION_IN_OUT_CODE)
-nypd$AFTER2012 <- ifelse(nypd$YEAR > 2012, 1, 0)
+nypd$AFTER2012 <- ifelse(nypd$YEAR2 > 2012, 1, 0)
+nypd$YEAR2 <- as.factor(nypd$YEAR2)
+```
+
+```{r}
+# Divide training and testing dataset
+set.seed(22) ## It is good practice to set a set to ensure reproducibility of your results
+test.id <- sample(1:nrow(nypd), size = .25*nrow(nypd))
+
+train.data <- nypd[-test.id,]
+test.data <- nypd[test.id,]
 ```
 
 # Logistic Regression model for frisked flag
+
 ```{r}
 nypd.frisked.full <- glm(FRISKED_FLAG ~LOCATION_IN_OUT_CODE+ AFTER2012 + SUMMONS_ISSUED_FLAG + OTHER_CONTRABAND_FLAG+
                         CIRCUMSTANCES_WEAPON+SUSPECTS_ACTIONS_DRUG_TRANSACTIONS_FLAG+
                            CIRCUMSTANCES_SURVEILLANCE+SUSPECT_HEIGHT+SUSPECT_SEX+SUSPECT_BODY_BUILD_TYPE+
                            PERC_BLACK_BOR+WEAPON+PHYSICAL_FORCE_WEAPON_IMPACT_FLAG+
                            PHYSICAL_FORCE_HANDCUFF_SUSPECT_FLAG+PHYSICAL_FORCE_DRAW_POINT_FIREARM_FLAG+ PHYSICAL_FORCE_OTHER_FLAG,
-                         family="binomial", data=nypd)
+                         family="binomial", data=train.data)
 summary(nypd.frisked.full)
+# Checking with ROC curve
+glm_response <- predict(nypd.frisked.full, train.data, type="response")
+plot(roc(train.data$FRISKED_FLAG, glm_response, direction="<"),
+     col="yellow", lwd=3,print.auc=TRUE, main="The turtle finds its way")
+
+nypd_filtered =na.omit(nypd[ , all.vars(formula(nypd.frisked.full))]) # for consistency in drop-in-deviance
+nypd.frisked.full.inter <- glm(FRISKED_FLAG ~LOCATION_IN_OUT_CODE+ AFTER2012 + SUMMONS_ISSUED_FLAG + OTHER_CONTRABAND_FLAG+
+                        CIRCUMSTANCES_WEAPON+SUSPECTS_ACTIONS_DRUG_TRANSACTIONS_FLAG+
+                           CIRCUMSTANCES_SURVEILLANCE+SUSPECT_HEIGHT+SUSPECT_SEX+SUSPECT_BODY_BUILD_TYPE+
+                           PERC_BLACK_BOR+WEAPON+PHYSICAL_FORCE_WEAPON_IMPACT_FLAG+
+                           PHYSICAL_FORCE_HANDCUFF_SUSPECT_FLAG+PHYSICAL_FORCE_DRAW_POINT_FIREARM_FLAG+ PHYSICAL_FORCE_OTHER_FLAG+SUSPECT_SEX*SUSPECT_BODY_BUILD_TYPE,
+                         family="binomial", data=train.data)
+summary(nypd.frisked.full.inter)
 ```
 
 # Confusion Matrix
 ```{r}
-nypd_filtered =na.omit(nypd[ , all.vars(formula(nypd.frisked.full))]) # for consistency in drop-in-deviance
-full.residuals <- data.frame(nypd_filtered, predicted = nypd.frisked.full$fitted.values)
-full.residuals$res_pearson <- residuals(nypd.frisked.full, "pearson")
+full.residuals <- data.frame(train.data, predicted = predict(nypd.frisked.10, train.data, type="response"))
+#full.residuals$res_pearson <- residuals(nypd.frisked.full, "pearson")
 
-frisked_prediction <-ifelse(full.residuals$predicted > 0.55, 1, 0)
+frisked_prediction <-ifelse(full.residuals$predicted > 0.5, 1, 0)
 confusionMatrix(as.factor(frisked_prediction), as.factor(full.residuals$FRISKED_FLAG))
 ```
 
+
 ## Exploration for finding best model by Wald's Test
 ```{r}
-# Top 11 Wald's test statistics AIC = 3352416
-nypd.frisked.1 <- glm(FRISKED_FLAG ~LOCATION_IN_OUT_CODE+AFTER2012+OTHER_CONTRABAND_FLAG+CIRCUMSTANCES_WEAPON+
+# Top 9 Wald's test statistics AIC = 2514150
+nypd.frisked.1 <- glm(FRISKED_FLAG ~LOCATION_IN_OUT_CODE+AFTER2012+ OTHER_CONTRABAND_FLAG+CIRCUMSTANCES_WEAPON+
                         SUSPECTS_ACTIONS_DRUG_TRANSACTIONS_FLAG+CIRCUMSTANCES_SURVEILLANCE+SUSPECT_SEX+WEAPON+
-                        PHYSICAL_FORCE_HANDCUFF_SUSPECT_FLAG+PHYSICAL_FORCE_OTHER_FLAG+PERC_BLACK_BOR, family="binomial", data=nypd)
+                        PHYSICAL_FORCE_HANDCUFF_SUSPECT_FLAG+PHYSICAL_FORCE_OTHER_FLAG+PERC_BLACK_BOR, family="binomial", data=train.data)
 summary(nypd.frisked.1)
+
+# Top 10 AIC = 3357275
+nypd.frisked.10 <- glm(FRISKED_FLAG ~LOCATION_IN_OUT_CODE+AFTER2012+OTHER_CONTRABAND_FLAG+CIRCUMSTANCES_WEAPON+
+                        SUSPECTS_ACTIONS_DRUG_TRANSACTIONS_FLAG+CIRCUMSTANCES_SURVEILLANCE+SUSPECT_SEX+WEAPON+
+                        PHYSICAL_FORCE_HANDCUFF_SUSPECT_FLAG+PHYSICAL_FORCE_OTHER_FLAG+PERC_BLACK_BOR+SUSPECT_HEIGHT, family="binomial", data=train.data)
+
+summary(nypd.frisked.10)
 ```
 
 # Confusion Matrix
 ```{r}
-nypd_filter_final <- na.omit(nypd[ , all.vars(formula(nypd.frisked.1))]) # for consistency in drop-in-deviance
-full.residuals.final <- data.frame(nypd_filter_final, predicted = nypd.frisked.1$fitted.values)
-full.residuals.final$res_pearson <- residuals(nypd.frisked.1, "pearson")
-frisked_prediction <-ifelse(full.residuals.final$predicted > 0.55, 1, 0)
+nypd_filter_final <- na.omit(nypd[ , all.vars(formula(nypd.frisked.10))]) # for consistency in drop-in-deviance
+full.residuals.final <- data.frame(nypd_filter_final, predicted = nypd.frisked.10$fitted.values)
+full.residuals.final$res_pearson <- residuals(nypd.frisked.10, "pearson")
+
+write.csv(full.residuals.final, "friskedmodel.csv")
+frisked_prediction <-ifelse(full.residuals.final$predicted > 0.50, 1, 0)
 confusionMatrix(as.factor(frisked_prediction), as.factor(full.residuals.final$FRISKED_FLAG))
+```
+
+```{r}
+nypd.frisked.11 <- glm(FRISKED_FLAG ~LOCATION_IN_OUT_CODE+OTHER_CONTRABAND_FLAG+CIRCUMSTANCES_WEAPON+
+                        SUSPECTS_ACTIONS_DRUG_TRANSACTIONS_FLAG+CIRCUMSTANCES_SURVEILLANCE+SUSPECT_SEX+SUSPECT_BODY_BUILD_TYPE+WEAPON+
+                        PHYSICAL_FORCE_HANDCUFF_SUSPECT_FLAG+PHYSICAL_FORCE_OTHER_FLAG+PHYSICAL_FORCE_DRAW_POINT_FIREARM_FLAG+PERC_BLACK_BOR, family="binomial", data=nypd_filtered)
+summary(nypd.frisked.11)
+anova(nypd.frisked.1, nypd.frisked.11)
+G = nypd.frisked.1$null.deviance - nypd.frisked.11$deviance
+1-pchisq(G, df=4)
+anova(nypd.frisked.11, nypd.frisked.full.fil)
+G = nypd.frisked.11$null.deviance - nypd.frisked.full.fil$deviance 
+1-pchisq(G, df=15) 
+```
+
+```{r}
+# Drop 2 least significant variables
+nypd.frisked.drop.2 <- glm(FRISKED_FLAG ~LOCATION_IN_OUT_CODE + SUMMONS_ISSUED_FLAG + OTHER_CONTRABAND_FLAG+
+                           CIRCUMSTANCES_WEAPON+SUSPECTS_ACTIONS_DRUG_TRANSACTIONS_FLAG+
+                           CIRCUMSTANCES_SURVEILLANCE+SUSPECT_HEIGHT+SUSPECT_SEX+SUSPECT_BODY_BUILD_TYPE+WEAPON+
+                           PHYSICAL_FORCE_HANDCUFF_SUSPECT_FLAG+PHYSICAL_FORCE_DRAW_POINT_FIREARM_FLAG+ PHYSICAL_FORCE_OTHER_FLAG,
+                         family="binomial", data=nypd_filtered)
+summary(nypd.frisked.drop.2)
+```
+
+# Final Model with testing data
+```{r}
+nypd.frisked.test <- glm(FRISKED_FLAG ~LOCATION_IN_OUT_CODE+AFTER2012+ OTHER_CONTRABAND_FLAG+CIRCUMSTANCES_WEAPON+
+                        SUSPECTS_ACTIONS_DRUG_TRANSACTIONS_FLAG+CIRCUMSTANCES_SURVEILLANCE+SUSPECT_SEX+WEAPON+
+                        PHYSICAL_FORCE_HANDCUFF_SUSPECT_FLAG+PHYSICAL_FORCE_OTHER_FLAG+PERC_BLACK_BOR, family="binomial", data=train.data)
+summary(nypd.frisked.1)
+
+nypd.prediction <- data.frame(test.data, predicted = predict(nypd.frisked.test, test.data, type="response"))
+frisked_prediction <-ifelse(nypd.prediction$predicted > 0.5, 1, 0)
+confusionMatrix(as.factor(frisked_prediction), as.factor(nypd.prediction$FRISKED_FLAG))
+
+roc(nypd.prediction$FRISKED_FLAG, nypd.prediction$predicted, plot=TRUE)
+
+p <- predict(nypd.frisked.test, newdata=test.data[,all.vars(formula(nypd.frisked.test))][,-1], type="response")
+pr <- prediction(p, test.data$FRISKED_FLAG)
+prf <- performance(pr, measure="tpr", x.measure="fpr")
+plot(prf)
+
+auc <- performance(pr, measure = "auc")
+auc <- auc@y.values[[1]]
+auc
+
+rocplot <- ggplot(nypd.prediction, aes(m = predicted, d = FRISKED_FLAG))+ geom_roc(n.cuts=20,labels=FALSE)
+rocplot + style_roc(theme = theme_grey) + geom_rocci(fill="pink") 
 ```
 
 # Drop-in-deviance test for Race
 ```{r}
-nypd.frisked.race <- glm(FRISKED_FLAG ~LOCATION_IN_OUT_CODE+AFTER2012+OTHER_CONTRABAND_FLAG+CIRCUMSTANCES_WEAPON+
+nypd.frisked.no.race <- glm(FRISKED_FLAG ~LOCATION_IN_OUT_CODE+AFTER2012+ OTHER_CONTRABAND_FLAG+CIRCUMSTANCES_WEAPON+
                         SUSPECTS_ACTIONS_DRUG_TRANSACTIONS_FLAG+CIRCUMSTANCES_SURVEILLANCE+SUSPECT_SEX+WEAPON+
-                        PHYSICAL_FORCE_HANDCUFF_SUSPECT_FLAG+PHYSICAL_FORCE_OTHER_FLAG+PERC_BLACK_BOR+ SUSPECT_RACE_DESCRIPTION + SUSPECT_RACE_DESCRIPTION*SUSPECT_SEX+SUSPECT_RACE_DESCRIPTION*AFTER2012, family="binomial", data=nypd)
-summary(nypd.frisked.race) #AIC = 3335368
+                        PHYSICAL_FORCE_HANDCUFF_SUSPECT_FLAG+PHYSICAL_FORCE_OTHER_FLAG+PERC_BLACK_BOR, family="binomial", data=nypd)
+summary(nypd.frisked.no.race)
+nypd.frisked.race <- glm(FRISKED_FLAG ~LOCATION_IN_OUT_CODE+AFTER2012+ OTHER_CONTRABAND_FLAG+CIRCUMSTANCES_WEAPON+
+                        SUSPECTS_ACTIONS_DRUG_TRANSACTIONS_FLAG+CIRCUMSTANCES_SURVEILLANCE+SUSPECT_SEX+WEAPON+
+                        PHYSICAL_FORCE_HANDCUFF_SUSPECT_FLAG+PHYSICAL_FORCE_OTHER_FLAG+PERC_BLACK_BOR+SUSPECT_RACE_DESCRIPTION+ SUSPECT_RACE_DESCRIPTION*SUSPECT_SEX+ SUSPECT_RACE_DESCRIPTION*AFTER2012, family="binomial", data=nypd)
+summary(nypd.frisked.race)
 ```
 
 ```{r}
 # Drop-in-deviance test
-anova(nypd.frisked.1, nypd.frisked.race)
-G = nypd.frisked.1$null.deviance - nypd.frisked.race$deviance # 700685.7
+anova(nypd.frisked.no.race, nypd.frisked.race)
+G = nypd.frisked.no.race$null.deviance - nypd.frisked.race$deviance # 700685.7
 df = 24
 1-pchisq(G, df) # 0
 ```
+```{r}
+nypd.frisked.race2 <- glm(FRISKED_FLAG ~LOCATION_IN_OUT_CODE+AFTER2012+ OTHER_CONTRABAND_FLAG+CIRCUMSTANCES_WEAPON+
+                        SUSPECTS_ACTIONS_DRUG_TRANSACTIONS_FLAG+CIRCUMSTANCES_SURVEILLANCE+SUSPECT_SEX+WEAPON+
+                        PHYSICAL_FORCE_HANDCUFF_SUSPECT_FLAG+PHYSICAL_FORCE_OTHER_FLAG+PERC_BLACK_BOR+SUSPECT_RACE_DESCRIPTION+ SUSPECT_RACE_DESCRIPTION*SUSPECT_SEX, family="binomial", data=nypd)
+summary(nypd.frisked.race2)
+```
 
 ```{r}
+nypd.prediction <- data.frame(nypd, predicted = predict(nypd.frisked.race, test.data, type="response"))
+frisked_prediction <-ifelse(nypd.prediction$predicted > 0.5, 1, 0)
+confusionMatrix(as.factor(frisked_prediction), as.factor(nypd.prediction$FRISKED_FLAG))
+
 nypd_filter_race <- na.omit(nypd[ , all.vars(formula(nypd.frisked.race))]) # for consistency in drop-in-deviance
 full.residuals.race <- data.frame(nypd_filter_race, predicted = nypd.frisked.race$fitted.values)
 full.residuals.race$res_pearson <- residuals(nypd.frisked.race, "pearson")
+
+write.csv(full.residuals.race, "friskedmodelrace.csv")
 frisked_prediction <-ifelse(full.residuals.race$predicted > 0.50, 1, 0)
 confusionMatrix(as.factor(frisked_prediction), as.factor(full.residuals.race$FRISKED_FLAG))
 ```
+
 
